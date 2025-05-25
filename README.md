@@ -28,7 +28,7 @@ It fetches a list of available plugins from a configurable manifest URL, display
 ## **Installation**
 
 1. **Download:**  
-   * Go to the [releases page of this plugin's repository](http://docs.google.com/YOUR_PLUGIN_RELEASE_PAGE_URL_HERE).  
+   * Go to the [releases page of this plugin's repository](https://github.com/ZaviiNet/EDMC_PluginBrowser/releases).  
    * Download the latest .zip file for the Plugin Browser.  
 2. **Install in EDMC:**  
    * Open EDMC.  
