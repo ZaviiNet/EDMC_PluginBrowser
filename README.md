@@ -100,5 +100,4 @@ Contact the maintainer of the specific plugin manifest you wish to be added to.
 ## **License**
 
 This plugin (EDMC Plugin Browser) is licensed under the GNU General Public License v2.0 or later.  
-(Or specify your chosen license if different)  
 *This README is for the EDMC Plugin Browser plugin. For EDMarketConnector itself, please refer to its own documentation.*
