@@ -80,7 +80,7 @@ The default manifest URL is: [Plugin_Manifest.json](https://raw.githubuserconten
   * Make sure you have restarted EDMC.  
   * Verify the plugin folder structure is correct inside your main EDMC plugins directory (e.g., PluginBrowser/load.py).
 
-For further issues, please check the EDMC logs (%TEMP%\\EDMarketConnector.log and %TEMP%\\EDMarketConnector\\EDMarketConnector-debug.log on Windows) and report issues on this plugin's repository: [Issues]](https://github.com/ZaviiNet/EDMC_PluginBrowser/issues)
+For further issues, please check the EDMC logs (%TEMP%\\EDMarketConnector.log and %TEMP%\\EDMarketConnector\\EDMarketConnector-debug.log on Windows) and report issues on this plugin's repository: [Issues](https://github.com/ZaviiNet/EDMC_PluginBrowser/issues)
 
 ## **For Plugin Developers (Wanting to be listed in a Manifest)**
 
