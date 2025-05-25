@@ -1,6 +1,6 @@
 # **EDMC Plugin Browser**
 
-Plugin Version: (Specify your plugin version here, e.g., 1.0.0)  
+Plugin Version: (1.0.0)  
 Compatible with EDMC: (Specify compatible EDMC versions, e.g., \>=5.0.0)
 
 ## **Description**
@@ -43,7 +43,7 @@ It fetches a list of available plugins from a configurable manifest URL, display
 2. Go to File \-\> Settings.  
 3. You will find a new tab labeled "**Plugin Browser**".  
 4. **Manifest URL:**  
-   * The first field allows you to set the URL for the plugin manifest file. By default, it points to \[YOUR\_DEFAULT\_MANIFEST\_URL\_HERE\_OR\_DESCRIBE\_IT\]. You can change this if you have an alternative manifest source.  
+   * The first field allows you to set the URL for the plugin manifest file. By default, it points to [Plugin_Manifest.json](https://raw.githubusercontent.com/ZaviiNet/edmc_plugins/main/plugin_manifest.json) . You can change this if you have an alternative manifest source.  
    * Changes to this URL are saved when you click "OK" on the main EDMC Settings window.  
 5. **Available Plugins:**  
    * This section lists plugins fetched from the Manifest URL.  
@@ -63,7 +63,7 @@ It fetches a list of available plugins from a configurable manifest URL, display
 
 The main configuration option for the Plugin Browser itself is the **Manifest URL**, which can be set directly in its settings tab. This URL points to a JSON file that lists available plugins.
 
-The default manifest URL is: \[YOUR\_DEFAULT\_MANIFEST\_URL\_HERE\_OR\_DESCRIBE\_IT\]
+The default manifest URL is: [Plugin_Manifest.json](https://raw.githubusercontent.com/ZaviiNet/edmc_plugins/main/plugin_manifest.json)
 
 (If you are maintaining a community manifest, provide details or a link here.)
 
@@ -80,7 +80,7 @@ The default manifest URL is: \[YOUR\_DEFAULT\_MANIFEST\_URL\_HERE\_OR\_DESCRIBE\
   * Make sure you have restarted EDMC.  
   * Verify the plugin folder structure is correct inside your main EDMC plugins directory (e.g., PluginBrowser/load.py).
 
-For further issues, please check the EDMC logs (%TEMP%\\EDMarketConnector.log and %TEMP%\\EDMarketConnector\\EDMarketConnector-debug.log on Windows) and report issues on this plugin's repository: \[YOUR\_PLUGIN\_ISSUES\_URL\_HERE\]
+For further issues, please check the EDMC logs (%TEMP%\\EDMarketConnector.log and %TEMP%\\EDMarketConnector\\EDMarketConnector-debug.log on Windows) and report issues on this plugin's repository: [Issues]](https://github.com/ZaviiNet/EDMC_PluginBrowser/issues)
 
 ## **For Plugin Developers (Wanting to be listed in a Manifest)**
 
