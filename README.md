@@ -1,7 +1,7 @@
 # **EDMC Plugin Browser**
 
-Plugin Version: (1.0.0)  
-Compatible with EDMC: (Specify compatible EDMC versions, e.g., \>=5.0.0)
+Plugin Version: (1.1.0)  
+Compatible with EDMC: (Specify compatible EDMC versions, e.g., \>=6.0.0)
 
 ## **Description**
 
@@ -101,3 +101,18 @@ Contact the maintainer of the specific plugin manifest you wish to be added to.
 
 This plugin (EDMC Plugin Browser) is licensed under the GNU General Public License v2.0 or later.  
 *This README is for the EDMC Plugin Browser plugin. For EDMarketConnector itself, please refer to its own documentation.*
+
+## **Updates**
+
+🚀 What's New in v1.1.0
+Full EDMC 6.0 Support: The plugin has been refactored to align with EDMC 6.0's new standards and configuration system.
+
+Python 3.13 Compatibility: Updated to run smoothly on the new Python version bundled with EDMC 6.0.
+
+Improved Stability:
+
+Switched to relative imports to prevent conflicts with other plugins.
+
+Removed dependencies on internal configuration paths for more robust file handling.
+
+Better error handling during plugin installation and removal.
