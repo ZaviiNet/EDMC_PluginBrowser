@@ -1,0 +1,17 @@
+{
+  "pluginName": "ExamplePlugin",
+  "pluginVer": "1.0.0",
+  "pluginZip": "https://github.com/your-username/ExamplePlugin/archive/refs/tags/v1.0.0.zip",
+  "autoUpdateEnabled": false,
+  "pluginAuthor": "Your Name",
+  "pluginMainLink": "https://github.com/your-username/ExamplePlugin",
+  "pluginLastUpdate": "2024-01-01",
+  "pluginDirName": "ExamplePlugin",
+  "pluginCategory": ["Examples", "Testing"],
+  "pluginDesc": "A simple example plugin to demonstrate the EDMC Plugin Browser.",
+  "pluginLastTestedEDMC": "6.0.0",
+  "pluginRequirements": [],
+  "pluginLicense": "MIT",
+  "pluginHash": "SHA256_HASH_OF_THE_ZIP_FILE",
+  "pluginVT": "VIRUSTOTAL_LINK"
+}

@@ -52,7 +52,7 @@ except ImportError as e:
           "Ensure it's in the same folder as this load.py.")
     # Define a dummy plugin_manager if it's missing, so the rest of the UI can at least try to load
     class DummyPluginManager: # type: ignore
-        DEFAULT_PLUGIN_BROWSER_MANIFEST_URL = "ERROR_MANIFEST_NOT_LOADED"
+        DEFAULT_PLUGIN_BROWSER_MANIFEST_URL = "https://github.com/EDCD/EDMC_Plugin_Registry/releases/latest/download/combined.json"
         PluginInfo = dict # type: ignore
         InstalledPluginInfo = dict # type: ignore
         def fetch_available_plugins(self, url, cb): return []
@@ -231,7 +231,7 @@ class PluginBrowserUI:
                     self.parent_frame.after(0, lambda: self._update_status(tr.tl("Failed to fetch plugin list or list is empty."), "warning"))
             else:
                 if self.parent_frame.winfo_exists():
-                    self.parent_frame.after(0, lambda: self._update_status(tr.tl("Available plugins list refreshed."), "info"))
+                    self.parent_frame.after(0, lambda: self._update_status(tr.tl("Available plugins list refreshed."), "success"))
         self._run_threaded_task(fetch_and_populate)
 
     def _populate_installed_plugins_tree(self, plugins_list: List[plugin_manager.InstalledPluginInfo]) -> None:

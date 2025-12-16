@@ -24,7 +24,8 @@ from EDMCLogging import get_main_logger
 logger = get_main_logger()
 
 # --- Constants ---
-DEFAULT_PLUGIN_BROWSER_MANIFEST_URL = "https://raw.githubusercontent.com/ZaviiNet/edmc_plugins/main/plugin_manifest.json"
+# Updated URL to point to the official EDCD Plugin Registry
+DEFAULT_PLUGIN_BROWSER_MANIFEST_URL = "https://github.com/ZaviiNet/EDMC_PluginBrowser/releases/latest/download/combined.json"
 REQUEST_TIMEOUT = 15  # seconds
 
 # --- Globals ---
@@ -38,16 +39,16 @@ def set_plugin_root(path: pathlib.Path) -> None:
     _PLUGIN_ROOT = path
 
 
-# Define a type for the plugin information dictionary
+# Define a type for the plugin information dictionary that the UI expects
 class PluginInfo(TypedDict):
-    id: str
-    name: str
-    version: str
-    author: str
-    description: str
-    downloadUrl: str
-    edmcCompatibility: Optional[str]
-    repositoryUrl: Optional[str]
+    id: str                 # Corresponds to 'pluginDirName'
+    name: str               # Corresponds to 'pluginName'
+    version: str            # Corresponds to 'pluginVer'
+    author: str             # Corresponds to 'pluginAuthor'
+    description: str        # Corresponds to 'pluginDesc'
+    downloadUrl: str        # Corresponds to 'pluginZip'
+    repositoryUrl: Optional[str]  # Corresponds to 'pluginMainLink'
+    edmcCompatibility: Optional[str] # Corresponds to 'pluginLastTestedEDMC'
 
 
 class InstalledPluginInfo(TypedDict):
@@ -89,20 +90,38 @@ def fetch_available_plugins(
     try:
         response = requests.get(manifest_url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
-        plugins_data = response.json()
+        # The new format is a dictionary with a 'plugins' key
+        plugins_outer_data = response.json()
 
+        if not isinstance(plugins_outer_data, dict) or "plugins" not in plugins_outer_data:
+            _status_update(status_callback, "Plugin manifest is not a valid dictionary or is missing 'plugins' key.", "error")
+            return []
+
+        plugins_data = plugins_outer_data["plugins"]
         if not isinstance(plugins_data, list):
-            _status_update(status_callback, "Plugin manifest is not a valid list.", "error")
+            _status_update(status_callback, "The 'plugins' key in the manifest is not a valid list.", "error")
             return []
 
         valid_plugins: List[PluginInfo] = []
+        # These are the mandatory keys from the new proposal
+        mandatory_keys = ["pluginName", "pluginVer", "pluginZip", "pluginAuthor", "pluginDirName"]
+
         for plugin_entry in plugins_data:
-            if all(key in plugin_entry for key in ["id", "name", "version", "author", "description", "downloadUrl"]):
-                plugin_entry.setdefault("edmcCompatibility", None)
-                plugin_entry.setdefault("repositoryUrl", None)
-                valid_plugins.append(plugin_entry)  # type: ignore
+            if all(key in plugin_entry for key in mandatory_keys):
+                # Map the new format to the old format expected by the UI
+                transformed_plugin: PluginInfo = {
+                    "id": plugin_entry["pluginDirName"],
+                    "name": plugin_entry["pluginName"],
+                    "version": plugin_entry["pluginVer"],
+                    "author": plugin_entry["pluginAuthor"],
+                    "description": plugin_entry.get("pluginDesc", ""), # Optional
+                    "downloadUrl": plugin_entry["pluginZip"],
+                    "repositoryUrl": plugin_entry.get("pluginMainLink"), # Optional
+                    "edmcCompatibility": plugin_entry.get("pluginLastTestedEDMC"), # Optional
+                }
+                valid_plugins.append(transformed_plugin)
             else:
-                logger.warning(f"Skipping invalid plugin entry in manifest: {plugin_entry.get('id', 'Unknown ID')}")
+                logger.warning(f"Skipping invalid plugin entry in manifest: {plugin_entry.get('pluginName', 'Unknown Name')}")
 
         _status_update(status_callback, f"Successfully fetched {len(valid_plugins)} plugins.", "info")
         return valid_plugins
@@ -158,6 +177,7 @@ def install_plugin(
         return False
 
     plugin_dir = _PLUGIN_ROOT
+    # 'id' now correctly maps to 'pluginDirName'
     plugin_id = plugin_info["id"]
     install_path = plugin_dir / plugin_id
     download_url = plugin_info["downloadUrl"]
@@ -181,27 +201,37 @@ def install_plugin(
                 f.write(chunk)
         _status_update(status_callback, "Download complete.", "info")
 
+        install_path.mkdir(parents=True, exist_ok=True)
         _status_update(status_callback, f"Extracting to {install_path}...", "info")
         with zipfile.ZipFile(temp_zip_path, "r") as zip_ref:
-            top_level_members = list(set(member.split('/', 1)[0] for member in zip_ref.namelist()))
+            # Check if the zip file contains a single top-level directory
+            top_level_members = list(set(member.split('/', 1)[0] for member in zip_ref.namelist() if member.strip()))
 
-            if len(top_level_members) == 1 and top_level_members[0].rstrip('/') == plugin_id:
+            if len(top_level_members) == 1:
+                # This handles cases where the zip contains a single directory (e.g., from GitHub source downloads).
+                # We extract to a temporary location and then move the contents.
                 temp_extract_path = plugin_dir / f"{plugin_id}_temp_extract"
                 temp_extract_path.mkdir(parents=True, exist_ok=True)
                 zip_ref.extractall(temp_extract_path)
-                shutil.move(str(temp_extract_path / plugin_id), str(install_path))
-                shutil.rmtree(temp_extract_path)
+
+                extracted_folder = temp_extract_path / top_level_members[0]
+                for item in extracted_folder.iterdir():
+                    shutil.move(str(item), str(install_path / item.name))
+
+                shutil.rmtree(temp_extract_path)  # Clean up the temp extract folder
             else:
-                install_path.mkdir(parents=True, exist_ok=True)
+                # This handles zips where files are at the root of the archive
                 zip_ref.extractall(install_path)
 
         _status_update(status_callback, f"Plugin '{plugin_info['name']}' installed successfully to {install_path}.",
-                       "info")
+                       "success")
         _status_update(status_callback, "Please restart EDMC for the new plugin to be loaded.", "warning")
         return True
     except Exception as e:
         _status_update(status_callback, f"Error installing plugin: {e}", "error")
-        # Cleanup code ...
+        # Cleanup failed installation
+        if install_path.exists():
+            shutil.rmtree(install_path)
     finally:
         if temp_zip_path.exists():
             temp_zip_path.unlink()
@@ -223,7 +253,7 @@ def remove_plugin(
         return False
     try:
         shutil.rmtree(path_to_remove)
-        _status_update(status_callback, f"Plugin '{plugin_folder_name}' removed successfully.", "info")
+        _status_update(status_callback, f"Plugin '{plugin_folder_name}' removed successfully.", "success")
         _status_update(status_callback, "Please restart EDMC for changes to take effect.", "warning")
         return True
     except Exception as e:
@@ -250,7 +280,7 @@ def enable_plugin(
         return False
     try:
         disabled_path.rename(enabled_path)
-        _status_update(status_callback, f"Plugin '{plugin_base_name}' enabled successfully.", "info")
+        _status_update(status_callback, f"Plugin '{plugin_base_name}' enabled successfully.", "success")
         _status_update(status_callback, "Please restart EDMC for changes to take effect.", "warning")
         return True
     except OSError as e:
@@ -277,7 +307,7 @@ def disable_plugin(
         return False
     try:
         enabled_path.rename(disabled_path)
-        _status_update(status_callback, f"Plugin '{plugin_base_name}' disabled successfully.", "info")
+        _status_update(status_callback, f"Plugin '{plugin_base_name}' disabled successfully.", "success")
         _status_update(status_callback, "Please restart EDMC for changes to take effect.", "warning")
         return True
     except OSError as e:

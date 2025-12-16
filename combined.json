@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2024-05-20T12:00:00Z",
+  "plugins": [
+    {
+      "pluginName": "ExamplePlugin",
+      "pluginVer": "1.0.0",
+      "pluginZip": "https://github.com/Zaviinet/ExamplePlugin/archive/refs/tags/v1.0.0.zip",
+      "autoUpdateEnabled": false,
+      "pluginAuthor": "Your Name",
+      "pluginMainLink": "https://github.com/Zaviinet/ExamplePlugin",
+      "pluginLastUpdate": "2024-01-01",
+      "pluginDirName": "ExamplePlugin",
+      "pluginCategory": [
+        "Examples",
+        "Testing"
+      ],
+      "pluginDesc": "A simple example plugin to demonstrate the EDMC Plugin Browser.",
+      "pluginLastTestedEDMC": "6.0.0",
+      "pluginRequirements": [],
+      "pluginLicense": "MIT",
+      "pluginHash": "SHA256_HASH_OF_THE_ZIP_FILE",
+      "pluginVT": "VIRUSTOTAL_LINK"
+    },
+    {
+      "pluginName": "Exploration Tools",
+      "pluginVer": "2.1.5",
+      "pluginZip": "https://github.com/cmdr-explorer/exploration-tools/releases/download/v2.1.5/exploration-tools.zip",
+      "autoUpdateEnabled": false,
+      "pluginAuthor": "CMDR Explorer",
+      "pluginMainLink": "https://github.com/cmdr-explorer/exploration-tools",
+      "pluginLastUpdate": "2024-02-15",
+      "pluginDirName": "ExplorationTools",
+      "pluginCategory": [
+        "Exploration",
+        "Navigation"
+      ],
+      "pluginDesc": "Helps commanders find high value worlds and track their journey.",
+      "pluginLastTestedEDMC": "6.0.0",
+      "pluginRequirements": [],
+      "pluginLicense": "GPLv3",
+      "pluginHash": "AABBCCDD12345678",
+      "pluginVT": "https://virustotal.com/result/example"
+    }
+  ]
+}
