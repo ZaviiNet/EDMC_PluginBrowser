@@ -25,7 +25,7 @@ logger = get_main_logger()
 
 # --- Constants ---
 # Updated URL to point to the official EDCD Plugin Registry
-DEFAULT_PLUGIN_BROWSER_MANIFEST_URL = "https://github.com/ZaviiNet/EDMC_PluginBrowser/releases/latest/download/combined.json"
+DEFAULT_PLUGIN_BROWSER_MANIFEST_URL = "https://github.com/ZaviiNet/EDMC_PluginBrowser/releases/download/1.1.1-dev/combined.json"
 REQUEST_TIMEOUT = 15  # seconds
 
 # --- Globals ---
@@ -313,3 +313,4 @@ def disable_plugin(
     except OSError as e:
         _status_update(status_callback, f"Error disabling plugin '{plugin_base_name}': {e}", "error")
     return False
+
