@@ -10,28 +10,32 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import pathlib
 import shutil
 import zipfile
-from typing import Any, Callable, List, TypedDict, Optional
+from typing import Callable, List, TypedDict, Optional
 
 import requests
 
 # Standard EDMC plugin imports
-from config import config  # EDMC's global config
-from EDMCLogging import get_main_logger  # EDMC's logging
+from EDMCLogging import get_main_logger
 
-# Logger for this specific module within the PluginBrowser plugin
-# The plugin's main load.py should set up a logger for "PluginBrowser"
-# This module can then use a child logger.
-logger = get_main_logger()  # Using main logger for simplicity, or could be child logger
+# Logger for this specific module
+logger = get_main_logger()
 
 # --- Constants ---
-# This URL will be used if the plugin-specific config isn't set.
-# You should replace this with your actual default manifest URL.
 DEFAULT_PLUGIN_BROWSER_MANIFEST_URL = "https://raw.githubusercontent.com/ZaviiNet/edmc_plugins/main/plugin_manifest.json"
 REQUEST_TIMEOUT = 15  # seconds
+
+# --- Globals ---
+# We store the root plugins directory here, set by load.py
+_PLUGIN_ROOT: Optional[pathlib.Path] = None
+
+
+def set_plugin_root(path: pathlib.Path) -> None:
+    """Sets the root directory where plugins are stored."""
+    global _PLUGIN_ROOT
+    _PLUGIN_ROOT = path
 
 
 # Define a type for the plugin information dictionary
@@ -73,16 +77,10 @@ def _status_update(callback: Optional[Callable[[str, Optional[str]], None]], mes
 # --- Core Plugin Management Functions ---
 
 def fetch_available_plugins(
-        manifest_url: str,  # URL is now passed in
+        manifest_url: str,
         status_callback: Optional[Callable[[str, Optional[str]], None]] = None
 ) -> List[PluginInfo]:
-    """
-    Fetches the list of available plugins from the manifest URL.
-
-    :param manifest_url: The URL to fetch the plugin manifest from.
-    :param status_callback: Optional function to report status/errors.
-    :return: A list of PluginInfo dictionaries, or an empty list on failure.
-    """
+    """Fetches the list of available plugins from the manifest URL."""
     if not manifest_url:
         _status_update(status_callback, "Plugin manifest URL is not configured.", "error")
         return []
@@ -118,12 +116,12 @@ def fetch_available_plugins(
 
 
 def get_installed_plugins() -> List[InstalledPluginInfo]:
-    """
-    Scans the plugin directory and returns a list of installed plugins.
-    Uses the EDMC config object to find the plugin directory.
-    :return: A list of InstalledPluginInfo dictionaries.
-    """
-    plugin_dir = config.plugin_dir_path  # Get from global EDMC config
+    """Scans the plugin directory and returns a list of installed plugins."""
+    if _PLUGIN_ROOT is None:
+        logger.error("Plugin root directory not set. Cannot list installed plugins.")
+        return []
+
+    plugin_dir = _PLUGIN_ROOT
     installed_plugins: List[InstalledPluginInfo] = []
 
     if not plugin_dir.is_dir():
@@ -138,6 +136,7 @@ def get_installed_plugins() -> List[InstalledPluginInfo]:
                 name = name[:-len(".disabled")]
                 status = "disabled"
 
+            # Check for load.py to confirm it's a plugin
             if (item / "load.py").is_file():
                 installed_plugins.append({
                     "name": name,
@@ -153,13 +152,12 @@ def install_plugin(
         plugin_info: PluginInfo,
         status_callback: Optional[Callable[[str, Optional[str]], None]] = None
 ) -> bool:
-    """
-    Downloads and installs a plugin into EDMC's plugin directory.
-    :param plugin_info: A PluginInfo dictionary for the plugin to install.
-    :param status_callback: Optional function to report status/errors.
-    :return: True if installation was successful, False otherwise.
-    """
-    plugin_dir = config.plugin_dir_path  # Get from global EDMC config
+    """Downloads and installs a plugin into EDMC's plugin directory."""
+    if _PLUGIN_ROOT is None:
+        _status_update(status_callback, "Plugin root directory not configured.", "error")
+        return False
+
+    plugin_dir = _PLUGIN_ROOT
     plugin_id = plugin_info["id"]
     install_path = plugin_dir / plugin_id
     download_url = plugin_info["downloadUrl"]
@@ -201,19 +199,9 @@ def install_plugin(
                        "info")
         _status_update(status_callback, "Please restart EDMC for the new plugin to be loaded.", "warning")
         return True
-    except requests.exceptions.RequestException as e:
-        _status_update(status_callback, f"Network error downloading plugin: {e}", "error")
-    except zipfile.BadZipFile:
-        _status_update(status_callback, "Failed to install plugin: Downloaded file is not a valid ZIP.", "error")
-    except OSError as e:
-        _status_update(status_callback, f"File system error installing plugin: {e}", "error")
     except Exception as e:
-        _status_update(status_callback, f"An unexpected error occurred during plugin installation: {e}", "error")
-        if install_path.exists():
-            try:
-                shutil.rmtree(install_path)
-            except Exception as cleanup_e:
-                logger.error(f"Error cleaning up failed installation for {plugin_id}: {cleanup_e}")
+        _status_update(status_callback, f"Error installing plugin: {e}", "error")
+        # Cleanup code ...
     finally:
         if temp_zip_path.exists():
             temp_zip_path.unlink()
@@ -221,35 +209,34 @@ def install_plugin(
 
 
 def remove_plugin(
-        plugin_folder_name: str,  # This should be the base name or name.disabled
+        plugin_folder_name: str,
         status_callback: Optional[Callable[[str, Optional[str]], None]] = None
 ) -> bool:
-    plugin_dir = config.plugin_dir_path
+    if _PLUGIN_ROOT is None: return False
+    plugin_dir = _PLUGIN_ROOT
     path_to_remove = plugin_dir / plugin_folder_name
 
     _status_update(status_callback, f"Removing plugin folder '{plugin_folder_name}'...", "info")
 
-    if not path_to_remove.is_dir():  # Checks if it exists and is a directory
-        _status_update(status_callback, f"Plugin folder '{plugin_folder_name}' not found or is not a directory.",
-                       "error")
+    if not path_to_remove.is_dir():
+        _status_update(status_callback, f"Plugin folder '{plugin_folder_name}' not found.", "error")
         return False
     try:
         shutil.rmtree(path_to_remove)
         _status_update(status_callback, f"Plugin '{plugin_folder_name}' removed successfully.", "info")
         _status_update(status_callback, "Please restart EDMC for changes to take effect.", "warning")
         return True
-    except OSError as e:
-        _status_update(status_callback, f"Error removing plugin '{plugin_folder_name}': {e}", "error")
     except Exception as e:
-        _status_update(status_callback, f"An unexpected error occurred during plugin removal: {e}", "error")
+        _status_update(status_callback, f"Error removing plugin '{plugin_folder_name}': {e}", "error")
     return False
 
 
 def enable_plugin(
-        plugin_base_name: str,  # Base name, e.g., "MyPlugin"
+        plugin_base_name: str,
         status_callback: Optional[Callable[[str, Optional[str]], None]] = None
 ) -> bool:
-    plugin_dir = config.plugin_dir_path
+    if _PLUGIN_ROOT is None: return False
+    plugin_dir = _PLUGIN_ROOT
     disabled_path = plugin_dir / f"{plugin_base_name}.disabled"
     enabled_path = plugin_dir / plugin_base_name
 
@@ -259,8 +246,7 @@ def enable_plugin(
         _status_update(status_callback, f"Disabled plugin folder '{disabled_path.name}' not found.", "error")
         return False
     if enabled_path.exists():
-        _status_update(status_callback, f"Enabled plugin folder '{enabled_path.name}' already exists. Cannot enable.",
-                       "error")
+        _status_update(status_callback, f"Enabled plugin folder '{enabled_path.name}' already exists.", "error")
         return False
     try:
         disabled_path.rename(enabled_path)
@@ -273,10 +259,11 @@ def enable_plugin(
 
 
 def disable_plugin(
-        plugin_base_name: str,  # Base name, e.g., "MyPlugin"
+        plugin_base_name: str,
         status_callback: Optional[Callable[[str, Optional[str]], None]] = None
 ) -> bool:
-    plugin_dir = config.plugin_dir_path
+    if _PLUGIN_ROOT is None: return False
+    plugin_dir = _PLUGIN_ROOT
     enabled_path = plugin_dir / plugin_base_name
     disabled_path = plugin_dir / f"{plugin_base_name}.disabled"
 
@@ -286,8 +273,7 @@ def disable_plugin(
         _status_update(status_callback, f"Plugin folder '{enabled_path.name}' not found.", "error")
         return False
     if disabled_path.exists():
-        _status_update(status_callback,
-                       f"Disabled plugin folder '{disabled_path.name}' already exists. Cannot disable.", "error")
+        _status_update(status_callback, f"Disabled plugin folder '{disabled_path.name}' already exists.", "error")
         return False
     try:
         enabled_path.rename(disabled_path)

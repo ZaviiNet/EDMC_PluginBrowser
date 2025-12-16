@@ -368,17 +368,23 @@ class PluginBrowserUI:
 def plugin_start3(plugin_dir: str) -> str:
     """
     EDMC calls this function when the plugin is loaded.
-    :param plugin_dir: The directory path of the plugin.
-    :return: The name of the plugin, which EDMC uses for display.
     """
     global this_plugin_logger
     try:
         current_plugin_folder_name = pathlib.Path(plugin_dir).name
         this_plugin_logger = get_plugin_logger(current_plugin_folder_name)
     except NameError:
-        this_plugin_logger = logging.getLogger(f"{appname}.{PLUGIN_NAME}") # Fallback
+        this_plugin_logger = logging.getLogger(f"{appname}.{PLUGIN_NAME}")
 
-    this_plugin_logger.info(f"Plugin '{PLUGIN_NAME}' version {appversion()} loaded from '{plugin_dir}'") # Use appversion from config module
+    this_plugin_logger.info(f"Plugin '{PLUGIN_NAME}' version {appversion()} loaded from '{plugin_dir}'")
+
+    # FIX: Explicitly set the plugin root directory for the manager.
+    # This avoids relying on config.plugin_dir_path which may change in internal re-factors.
+    # The 'plugin_dir' argument is the specific folder for THIS plugin.
+    # The parent of that is the root 'plugins' folder.
+    root_plugin_dir = pathlib.Path(plugin_dir).parent
+    plugin_manager.set_plugin_root(root_plugin_dir)
+
     return PLUGIN_NAME
 
 
