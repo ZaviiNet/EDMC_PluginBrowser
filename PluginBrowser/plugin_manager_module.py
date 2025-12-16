@@ -25,7 +25,10 @@ logger = get_main_logger()
 
 # --- Constants ---
 # Updated URL to point to the official EDCD Plugin Registry
-DEFAULT_PLUGIN_BROWSER_MANIFEST_URL = "https://github.com/ZaviiNet/EDMC_PluginBrowser/releases/latest/download/combined.json"
+DEFAULT_PLUGIN_BROWSER_MANIFEST_URL = "https://github.com/EDCD/EDMC_Plugin_Registry/releases/latest/download/combined.json"
+# URL for reporting anonymous download stats (Placeholder)
+# Set this to your tracking server endpoint, e.g., "https://api.example.com/track/download"
+TRACKING_URL = "https://edmc-plugin-stats.trancefx.workers.dev/track"
 REQUEST_TIMEOUT = 15  # seconds
 
 # --- Globals ---
@@ -49,6 +52,8 @@ class PluginInfo(TypedDict):
     downloadUrl: str        # Corresponds to 'pluginZip'
     repositoryUrl: Optional[str]  # Corresponds to 'pluginMainLink'
     edmcCompatibility: Optional[str] # Corresponds to 'pluginLastTestedEDMC'
+    lastUpdate: str         # Corresponds to 'pluginLastUpdate' (ISO 8601 YYYY-MM-DD)
+    downloads: int          # Corresponds to 'downloads' (optional in JSON, default 0)
 
 
 class InstalledPluginInfo(TypedDict):
@@ -73,6 +78,25 @@ def _status_update(callback: Optional[Callable[[str, Optional[str]], None]], mes
             logger.warning(message)
         else:
             logger.info(message)
+
+
+def record_download(plugin_id: str) -> None:
+    """
+    Records a download for the given plugin ID.
+    This is intended to be an anonymous ping to a stats server.
+    """
+    if not TRACKING_URL:
+        logger.debug(f"Download tracking disabled (no URL). Downloaded: {plugin_id}")
+        return
+
+    try:
+        # Example payload
+        payload = {"pluginId": plugin_id}
+        # Fire and forget - we don't want to block or fail the install if tracking fails
+        requests.post(TRACKING_URL, json=payload, timeout=5)
+        logger.info(f"Recorded download for {plugin_id}")
+    except Exception as e:
+        logger.warning(f"Failed to record download stat for {plugin_id}: {e}")
 
 
 # --- Core Plugin Management Functions ---
@@ -118,6 +142,8 @@ def fetch_available_plugins(
                     "downloadUrl": plugin_entry["pluginZip"],
                     "repositoryUrl": plugin_entry.get("pluginMainLink"), # Optional
                     "edmcCompatibility": plugin_entry.get("pluginLastTestedEDMC"), # Optional
+                    "lastUpdate": plugin_entry.get("pluginLastUpdate", "1970-01-01"), # Default to old date
+                    "downloads": plugin_entry.get("downloads", 0) # Default to 0
                 }
                 valid_plugins.append(transformed_plugin)
             else:
@@ -222,6 +248,9 @@ def install_plugin(
             else:
                 # This handles zips where files are at the root of the archive
                 zip_ref.extractall(install_path)
+
+        # Record the download statistic
+        record_download(plugin_id)
 
         _status_update(status_callback, f"Plugin '{plugin_info['name']}' installed successfully to {install_path}.",
                        "success")

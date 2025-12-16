@@ -14,6 +14,7 @@ import logging # For plugin-specific logger setup
 import pathlib
 import webbrowser # For opening repository URLs
 from typing import List, Optional, Callable, Any # For type hinting
+from datetime import datetime
 
 # EDMC core imports
 try:
@@ -103,32 +104,24 @@ class PluginBrowserUI:
         available_outer_frame = ttk.Frame(self.parent_frame)
         available_outer_frame.grid(row=1, column=0, sticky=tk.NSEW, padx=self.PADX, pady=self.PADY)
         available_outer_frame.columnconfigure(0, weight=1)
-        available_outer_frame.rowconfigure(0, weight=1) # LabelFrame row expands
+        available_outer_frame.rowconfigure(0, weight=1) # Notebook row expands
 
-        available_frame = ttk.LabelFrame(available_outer_frame, text=tr.tl("Available Plugins"), padding=(self.PADX, self.PADY))
-        available_frame.grid(row=0, column=0, sticky=tk.NSEW)
-        available_frame.columnconfigure(0, weight=1) # Treeview column expands
-        available_frame.rowconfigure(0, weight=1)    # Treeview row expands
+        # Create a Notebook to hold the different filtered views
+        self.available_plugins_notebook = ttk.Notebook(available_outer_frame)
+        self.available_plugins_notebook.grid(row=0, column=0, sticky=tk.NSEW)
+        self.available_plugins_notebook.enable_traversal()
 
-        available_cols = ("name", "author", "version", "description")
-        self.available_plugins_tree = ttk.Treeview(available_frame, columns=available_cols, show="headings", height=10, selectmode="browse")
-        self.available_plugins_tree.grid(row=0, column=0, sticky=tk.NSEW, padx=self.PADX, pady=self.BOXY)
+        # We'll create a treeview for each tab
+        self.treeviews = {}
+        for tab_name in ["All", "Recently Updated", "Most Downloaded"]:
+            frame = ttk.Frame(self.available_plugins_notebook)
+            self.available_plugins_notebook.add(frame, text=tr.tl(tab_name))
+            tree = self._create_available_plugins_tree(frame)
+            self.treeviews[tab_name] = tree
 
-        for col, heading, width, stretch in [
-            ("name", tr.tl("Name"), 150, tk.NO),
-            ("author", tr.tl("Author"), 120, tk.NO),
-            ("version", tr.tl("Version"), 70, tk.NO),
-            ("description", tr.tl("Description"), 300, tk.YES)
-        ]:
-            self.available_plugins_tree.heading(col, text=heading)
-            self.available_plugins_tree.column(col, width=width, anchor=tk.W, stretch=stretch)
-
-        available_scrollbar = ttk.Scrollbar(available_frame, orient=tk.VERTICAL, command=self.available_plugins_tree.yview)
-        self.available_plugins_tree.configure(yscrollcommand=available_scrollbar.set)
-        available_scrollbar.grid(row=0, column=1, sticky='ns')
-
+        # Buttons frame below the notebook
         available_buttons_frame = ttk.Frame(available_outer_frame)
-        available_buttons_frame.grid(row=1, column=0, sticky=tk.EW, padx=self.PADX, pady=(self.BOXY, self.PADY)) # Add bottom padding
+        available_buttons_frame.grid(row=1, column=0, sticky=tk.EW, padx=self.PADX, pady=(self.BOXY, self.PADY))
 
         self.refresh_button = ttk.Button(available_buttons_frame, text=tr.tl("Refresh List"), command=self._refresh_available_plugins_list)
         self.refresh_button.pack(side=tk.LEFT, padx=(0, self.PADX))
@@ -179,11 +172,36 @@ class PluginBrowserUI:
 
         self.available_plugins_list: List[plugin_manager.PluginInfo] = []
 
-        self.available_plugins_tree.bind("<<TreeviewSelect>>", self._on_available_plugin_select)
+        self.available_plugins_notebook.bind("<<NotebookTabChanged>>", self._on_available_plugin_select)
         self.installed_plugins_tree.bind("<<TreeviewSelect>>", self._on_installed_plugin_select)
 
         self._refresh_installed_plugins_list()
         self._refresh_available_plugins_list()
+
+    def _create_available_plugins_tree(self, parent: ttk.Frame) -> ttk.Treeview:
+        """Creates and configures a Treeview for available plugins."""
+        parent.columnconfigure(0, weight=1)
+        parent.rowconfigure(0, weight=1)
+
+        cols = ("name", "author", "version", "description")
+        tree = ttk.Treeview(parent, columns=cols, show="headings", height=10, selectmode="browse")
+        tree.grid(row=0, column=0, sticky=tk.NSEW, padx=self.PADX, pady=self.BOXY)
+
+        for col, heading, width, stretch in [
+            ("name", tr.tl("Name"), 150, tk.NO),
+            ("author", tr.tl("Author"), 120, tk.NO),
+            ("version", tr.tl("Version"), 70, tk.NO),
+            ("description", tr.tl("Description"), 300, tk.YES)
+        ]:
+            tree.heading(col, text=heading)
+            tree.column(col, width=width, anchor=tk.W, stretch=stretch)
+
+        scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.grid(row=0, column=1, sticky='ns')
+
+        tree.bind("<<TreeviewSelect>>", self._on_available_plugin_select)
+        return tree
 
     def _update_status(self, message: str, msg_type: Optional[str] = "info") -> None:
         if not self.status_label.winfo_exists(): return
@@ -206,18 +224,38 @@ class PluginBrowserUI:
         thread = threading.Thread(target=task_wrapper, daemon=True)
         thread.start()
 
-    def _populate_available_plugins_tree(self, plugins_list: List[plugin_manager.PluginInfo]) -> None:
-        if not self.available_plugins_tree.winfo_exists(): return
-        self.available_plugins_tree.delete(*self.available_plugins_tree.get_children())
+    def _populate_all_tabs(self, plugins_list: List[plugin_manager.PluginInfo]) -> None:
+        """Populates all the tabs with sorted and filtered plugin data."""
+        if not self.parent_frame.winfo_exists(): return
         self.available_plugins_list = plugins_list
-        for plugin in plugins_list:
+
+        # Populate "All" tab (sorted alphabetically)
+        all_plugins = sorted(plugins_list, key=lambda p: p['name'].lower())
+        self._populate_tree(self.treeviews["All"], all_plugins)
+
+        # Populate "Recently Updated" tab
+        try:
+            recently_updated = sorted(plugins_list, key=lambda p: datetime.fromisoformat(p['lastUpdate']), reverse=True)
+            self._populate_tree(self.treeviews["Recently Updated"], recently_updated)
+        except (ValueError, TypeError) as e:
+            self._update_status(f"Error sorting by date: {e}", "error")
+
+        # Populate "Most Downloaded" tab
+        most_downloaded = sorted(plugins_list, key=lambda p: p['downloads'], reverse=True)
+        self._populate_tree(self.treeviews["Most Downloaded"], most_downloaded)
+
+        self._on_available_plugin_select()
+
+    def _populate_tree(self, tree: ttk.Treeview, plugins: List[plugin_manager.PluginInfo]):
+        """Helper to clear and populate a single treeview."""
+        tree.delete(*tree.get_children())
+        for plugin in plugins:
             desc = plugin.get("description", "")
             short_desc = desc[:100] + ("..." if len(desc) > 100 else "")
-            self.available_plugins_tree.insert("", tk.END, values=(
+            tree.insert("", tk.END, values=(
                 plugin.get("name", "N/A"), plugin.get("author", "N/A"),
                 plugin.get("version", "N/A"), short_desc
             ), iid=plugin.get("id"))
-        self._on_available_plugin_select()
 
     def _refresh_available_plugins_list(self) -> None:
         self._update_status(tr.tl("Refreshing available plugins list..."), "info")
@@ -225,7 +263,7 @@ class PluginBrowserUI:
             url = self.manifest_url_var.get()
             plugins = plugin_manager.fetch_available_plugins(url, self._update_status)
             if self.parent_frame.winfo_exists():
-                self.parent_frame.after(0, lambda: self._populate_available_plugins_tree(plugins))
+                self.parent_frame.after(0, lambda: self._populate_all_tabs(plugins))
             if not plugins:
                 if self.parent_frame.winfo_exists():
                     self.parent_frame.after(0, lambda: self._update_status(tr.tl("Failed to fetch plugin list or list is empty."), "warning"))
@@ -251,7 +289,12 @@ class PluginBrowserUI:
         self._run_threaded_task(fetch_and_populate_installed)
 
     def _get_selected_available_plugin_info(self) -> Optional[plugin_manager.PluginInfo]:
-        selected_item_ids = self.available_plugins_tree.selection()
+        active_tab_index = self.available_plugins_notebook.index(self.available_plugins_notebook.select())
+        active_tab_name = self.available_plugins_notebook.tab(active_tab_index, "text")
+        active_tree = self.treeviews.get(active_tab_name)
+        if not active_tree: return None
+
+        selected_item_ids = active_tree.selection()
         if not selected_item_ids: return None
         plugin_id = selected_item_ids[0] # Treeview selection returns IID
         return next((p for p in self.available_plugins_list if p['id'] == plugin_id), None)
@@ -344,12 +387,13 @@ class PluginBrowserUI:
             self._run_threaded_task(do_toggle)
 
     def _on_available_plugin_select(self, event=None) -> None:
-        if not self.available_plugins_tree.winfo_exists(): return
-        selected = self.available_plugins_tree.selection()
-        self.install_button.config(state=tk.NORMAL if selected else tk.DISABLED)
-
+        if not self.parent_frame.winfo_exists(): return
+        
         plugin_info = self._get_selected_available_plugin_info()
-        self.view_repo_button.config(state=tk.NORMAL if plugin_info and plugin_info.get("repositoryUrl") else tk.DISABLED)
+        has_selection = plugin_info is not None
+
+        self.install_button.config(state=tk.NORMAL if has_selection else tk.DISABLED)
+        self.view_repo_button.config(state=tk.NORMAL if has_selection and plugin_info.get("repositoryUrl") else tk.DISABLED)
 
     def _on_installed_plugin_select(self, event=None) -> None:
         if not self.installed_plugins_tree.winfo_exists(): return
